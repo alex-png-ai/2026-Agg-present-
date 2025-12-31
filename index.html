@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2026 : BREAK THE LIMIT // MEMORY</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=Permanent+Marker&family=Rubik+Glitch&family=Black+Ops+One&family=Patrick+Hand&family=Cinzel:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #050505;
+            color: #fff;
+            overflow: hidden;
+            user-select: none; 
+        }
+
+        .font-marker { font-family: 'Permanent Marker', cursive; }
+        .font-glitch { font-family: 'Rubik Glitch', system-ui; }
+        .font-ops { font-family: 'Black Ops One', system-ui; }
+        .font-hand { font-family: 'Patrick Hand', cursive; }
+        .font-cinzel { font-family: 'Cinzel', serif; }
+
+        /* 背景風格 */
+        .bg-street {
+            background-color: #111;
+            background-image: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url("https://www.transparenttextures.com/patterns/wall-4-light.png");
+        }
+        .bg-reveal {
+            background-color: #000;
+            background-image: radial-gradient(circle at center, #222 0%, #000 70%);
+        }
+        /* 焚石矢風格 - 禮物 */
+        .bg-endo {
+            background-color: #080808;
+            background-image: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(20,20,20,0.5) 50%, rgba(0,0,0,0.9) 100%), url("https://www.transparenttextures.com/patterns/concrete-wall.png");
+            position: relative;
+        }
+        .bg-endo::before {
+            content: ""; position: absolute; inset: 0;
+            background: linear-gradient(75deg, transparent 40%, rgba(255,255,255,0.03) 40.5%, transparent 41%), linear-gradient(-65deg, transparent 60%, rgba(255,255,255,0.02) 60.5%, transparent 61%);
+            pointer-events: none; z-index: 1;
+        }
+        .vignette {
+            position: absolute; inset: 0;
+            background: radial-gradient(circle, transparent 40%, #000 100%);
+            pointer-events: none; z-index: 2;
+        }
+        .manga-lines {
+            background: repeating-linear-gradient(90deg, transparent, transparent 50px, rgba(255, 255, 255, 0.05) 50px, rgba(255, 255, 255, 0.05) 52px);
+        }
+
+        /* 動畫 */
+        @keyframes scare-flash {
+            0% { opacity: 1; filter: invert(0) hue-rotate(0deg); transform: scale(1); }
+            10% { opacity: 0.8; filter: invert(1) hue-rotate(90deg); transform: scale(1.1) translate(-10px, 10px); }
+            20% { opacity: 1; filter: invert(0) hue-rotate(0deg); transform: scale(1.2) translate(10px, -10px); }
+            30% { opacity: 0.8; filter: invert(1) hue-rotate(180deg); transform: scale(1.1) translate(-5px, 5px); }
+            40% { opacity: 1; filter: invert(0) hue-rotate(0deg); transform: scale(1); }
+            100% { opacity: 1; filter: invert(0); transform: scale(1); }
+        }
+        .scare-anim { animation: scare-flash 0.15s infinite; }
+        .shake-hard { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+        @keyframes impact-flash { 0% { background-color: white; opacity: 1; } 100% { background-color: transparent; opacity: 0; } }
+        .animate-impact { animation: impact-flash 0.3s ease-out forwards; }
+        .glitch-text { position: relative; }
+        .glitch-text::before, .glitch-text::after { content: attr(data-text); position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; }
+        .glitch-text::before { left: 2px; text-shadow: -1px 0 #ff0000; clip: rect(44px, 450px, 56px, 0); animation: glitch-anim 0.5s infinite linear alternate-reverse; }
+        .glitch-text::after { left: -2px; text-shadow: -1px 0 #00ffff; clip: rect(44px, 450px, 56px, 0); animation: glitch-anim2 0.5s infinite linear alternate-reverse; }
+        @keyframes glitch-anim { 0% { clip: rect(12px, 9999px, 56px, 0); } 100% { clip: rect(66px, 9999px, 22px, 0); } }
+        @keyframes glitch-anim2 { 0% { clip: rect(66px, 9999px, 2px, 0); } 100% { clip: rect(11px, 9999px, 62px, 0); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const { motion, AnimatePresence } = window.Motion;
+
+        // --- AUDIO ENGINE ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const synth = {
+            resume: () => { if (audioCtx.state === 'suspended') audioCtx.resume(); },
+
+            playTone: (freq, type, duration, vol = 0.1) => {
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + 0.01); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + duration);
+            },
+            playNoise: (duration) => {
+                const bufferSize = audioCtx.sampleRate * duration; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(1.5, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                noise.connect(gain); gain.connect(audioCtx.destination); noise.start();
+            },
+            click: () => { synth.playTone(600, 'square', 0.05, 0.1); synth.playTone(100, 'triangle', 0.05, 0.3); },
+            error: () => { synth.playTone(150, 'sawtooth', 0.3, 0.2); setTimeout(() => synth.playTone(100, 'sawtooth', 0.3, 0.2), 100); },
+            unlock: () => { synth.playTone(440, 'sine', 0.2, 0.2); setTimeout(() => synth.playTone(554, 'sine', 0.2, 0.2), 100); setTimeout(() => synth.playTone(659, 'sine', 0.4, 0.2), 200); },
+            impact: () => {
+                const bufferSize = audioCtx.sampleRate * 0.3; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(2.0, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                noise.connect(gain); gain.connect(audioCtx.destination); noise.start();
+                const osc = audioCtx.createOscillator(); const kGain = audioCtx.createGain();
+                osc.type = 'sine'; osc.frequency.setValueAtTime(150, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.2);
+                kGain.gain.setValueAtTime(1.0, audioCtx.currentTime); kGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                osc.connect(kGain); kGain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+            },
+            intro: () => { synth.playNoise(0.8); synth.playTone(50, 'square', 1.5, 0.5); },
+            jumpscare: () => { 
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, audioCtx.currentTime); osc.frequency.linearRampToValueAtTime(1500, audioCtx.currentTime + 0.2); 
+                const lfo = audioCtx.createOscillator(); lfo.frequency.value = 30; const lfoGain = audioCtx.createGain(); lfoGain.gain.value = 1000;
+                lfo.connect(lfoGain); lfoGain.connect(osc.frequency); lfo.start();
+                gain.gain.setValueAtTime(0, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime + 0.1); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 3.0);
+                osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 3.0);
+                synth.playNoise(2.0);
+            },
+            silence: () => { }
+        };
+
+        const MUSIC_URLS = {
+            suspense: "https://actions.google.com/sounds/v1/horror/horror_ambience.ogg", 
+            intro_beat: "https://actions.google.com/sounds/v1/impacts/crash_heavy_metal.ogg",
+            // 👉 已更新：這裡設定為讀取同資料夾下的 MP3 檔案
+            // 請確保您的 MP3 檔名完全一致，並放在 index.html 旁邊
+            memory_ch1: "./memory_bgm.mp3" 
+        };
+        const bgmPlayer = new Audio();
+        bgmPlayer.loop = true;
+
+        // --- 2. DATA SECTION ---
+        
+        // ** 回憶錄內容 (Updated for Chapter 1 Narrative) **
+        const MEMORY_CHAPTERS = [
+            {
+                id: 1,
+                title: "Chapter 01: 那一天",
+                photos: ['IMG_1.jpg'], // 👉 已更新為 IMG_1.jpg
+                // 使用 lines 陣列來控制分段顯示與節奏
+                lines: [
+                    { text: "今年的第一次見面，\n也是時隔好幾年的再見。", delay: 0 },
+                    { text: "好久沒見，第一眼就覺得——\n哇，你變好多。", delay: 1.5 },
+                    { text: "陪你去上課，\n我還覺得老師其實滿不錯的，\n只是那堂課真的好笑。", delay: 3.5 }, // 1.5 + 2.0
+                    { text: "然後我講話超大聲，\n全班都往我這邊看。\n現在想起來真的超智障。", delay: 5.0 }, // 3.5 + 1.5
+                    { text: "後來要去羽球館看比賽，\n我們還找不到場館，\n就在那邊亂走。", delay: 7.0 } // 5.0 + 2.0
+                ],
+                bgm: MUSIC_URLS.memory_ch1 // 指定這章節的專屬音樂
+            },
+            { id: 2, title: "Chapter 02", photos: ['IMG_7375.jpg'], text: "一起去過的地方，看過的風景。\n這張照片裡的你笑得好燦爛，\n是我最喜歡的瞬間。" },
+            { id: 3, title: "Chapter 03", photos: ['food_01.jpg'], text: "味覺的回憶最誠實。\n那天吃到的東西其實普普，\n但因為跟妳一起吃，變成了米其林三星。" },
+            { id: 4, title: "Chapter 04", photos: ['IMG_0789.jpg'], text: "屬於我們的 Highlight 時刻。\n那一晚的燈光、聲音，\n還有妳轉過頭對我說的話。" },
+            { id: 5, title: "Chapter 05", photos: ['IMG_0790.jpg'], text: "妳的風格無人能敵。\n不管是穿搭還是面對生活的態度，\n總是讓我深深著迷。" },
+            { id: 6, title: "Chapter 06", photos: ['future_01.jpg'], text: "2026，還要一起創造更多回憶。\n準備好迎接下一個篇章了嗎？" }
+        ];
+
+        const RIDDLES = [
+            { id: 1, question: "我們今年第一次見面的地點在哪？", hintText: "提示：南部校園 / 第一次見 / 那一天 / 熟悉的地方", answerKeywords: ["成大", "成功大學"], matchType: "include", correctMsg: "沒錯，那是我們記憶的起點。\n這一次，試試看密碼 04 開頭。", gameHint: "提示：密碼前兩碼是 04", nextStage: "game" },
+            { id: 2, question: "我們第一次一起去吃的那間貓咖，名字是什麼？", hintText: "", answerKeywords: ["洢玖"], matchType: "exact", correctMsg: "You remembered.\nThat moment stayed with you.", gameHint: "提示：洢玖... 試試看。", nextStage: "game" },
+            { id: 3, question: "7 月 31 號那天，我去比羽球比賽，我贏了幾場？", hintText: "", answerKeywords: ["1"], matchType: "exact", correctMsg: "You really listened.\nThat’s all that matters.", gameHint: "", nextStage: "reveal" }
+        ];
+
+        const SafeImage = ({ src, index, className }) => {
+            const fallback = `https://images.unsplash.com/photo-${['1516035069371-29a1b244cc32','1494783367193-149034c05e8f','1529333441280-03fa95737530','1470071459604-3b5ec3a7fe05','1518199227788-9962e750a804','1523438885216-e655a4325c27', '1534528741775-53994a69daeb', '1519681393797-a1204ef3a50b', '1504194104404-433180773017'][index % 9]}?auto=format&fit=crop&w=600&q=80`;
+            const [imgSrc, setImgSrc] = useState(src);
+            return <img src={imgSrc} alt="memory" className={className} onError={() => setImgSrc(fallback)} />;
+        };
+
+        const GIFT_IMAGES = { strawberry: 'S__75063318.jpg', jellyfish: 'S__75063319.jpg', potato: 'S__75063320.jpg' };
+        const RAW_GIFTS = [
+            { id: 'gift_strawberry', title: "WINTER LIMITED", subtitle: "冬季限定草莓便當", desc: "季節限定的甜美滋味，只屬於妳的草莓盛宴！", imgSrc: GIFT_IMAGES.strawberry, color: "#ff0000", isLineGift: false },
+            { id: 'gift_jellyfish', title: "LOST JELLYFISH", subtitle: "水母找弟弟", desc: "來自深海的呆萌請求 (LINE 禮物)", imgSrc: GIFT_IMAGES.jellyfish, color: "#0000ff", isLineGift: true, link: "https://giftshop-tw.line.me/" },
+            { id: 'gift_potato', title: "HAPPY BURGER", subtitle: "快樂堡薯於你", desc: "不管發生什麼事，快樂永遠薯於妳！", color: "#ffaa00", isLineGift: false }
+        ];
+        const NOTIFY_EMAIL = "alex0903857536@gmail.com";
+        
+        // --- COMPONENTS ---
+
+        const IntroScreen = ({ onStart }) => {
+            return (
+                <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="h-screen flex flex-col items-center justify-center text-center p-6 bg-street relative overflow-hidden">
+                    <div className="absolute inset-0 manga-lines opacity-20 pointer-events-none"></div>
+                    <div className="absolute top-10 left-10 text-6xl font-marker text-white/10 rotate-12 pointer-events-none">FIGHT</div>
+                    <div className="absolute bottom-10 right-10 text-8xl font-marker text-red-600/20 -rotate-12 pointer-events-none">WIN</div>
+                    <div className="relative z-10 mix-blend-difference">
+                        <h1 className="text-7xl md:text-9xl font-ops mb-2 tracking-tighter text-white" style={{textShadow: "4px 4px 0px #ff0000"}}>2026</h1>
+                        <h2 className="text-4xl md:text-6xl font-marker text-red-600 bg-white px-4 transform -skew-x-12 inline-block mb-12 border-4 border-black">BREAK THE LIMIT</h2>
+                    </div>
+                    <p className="text-lg text-gray-400 mb-8 font-mono tracking-widest bg-black/80 px-4 py-1">ARE YOU READY TO BREAK THE LOOP?</p>
+                    <button onClick={() => { synth.resume(); synth.intro(); const i = new Audio(MUSIC_URLS.intro_beat); i.volume=0.5; i.play().catch(()=>{}); onStart(); }} className="group relative px-10 py-4 bg-red-600 text-white font-ops text-3xl tracking-widest hover:bg-white hover:text-black transition-all border-2 border-transparent hover:border-red-600" style={{clipPath: "polygon(10% 0, 100% 0, 90% 100%, 0% 100%)"}}>
+                        <span className="block group-hover:translate-x-1 transition-transform">START</span>
+                    </button>
+                </motion.div>
+            );
+        }
+
+        const Game1A2B = ({ onUnlock, onFail, hint }) => {
+            const [input, setInput] = useState("");
+            const [shake, setShake] = useState(false);
+            const [history, setHistory] = useState([]); 
+            const [failCount, setFailCount] = useState(0); 
+            const secret = "0427";
+
+            useEffect(() => {
+                bgmPlayer.src = MUSIC_URLS.suspense;
+                bgmPlayer.volume = 0.4;
+                bgmPlayer.play().catch(()=>{});
+                return () => bgmPlayer.pause();
+            }, []);
+
+            const calculateAB = (guess, answer) => {
+                let a = 0; let b = 0;
+                for (let i = 0; i < 4; i++) { if (guess[i] === answer[i]) a++; else if (answer.includes(guess[i])) b++; }
+                return `${a}A${b}B`;
+            };
+
+            const handleInput = (num) => { synth.click(); if (input.length < 4) setInput(prev => prev + num); };
+            const handleDelete = () => { synth.click(); setInput(prev => prev.slice(0, -1)); };
+            const handleSubmit = () => {
+                if (input.length !== 4) return;
+                if (input === secret) { synth.unlock(); onUnlock(); } 
+                else {
+                    const result = calculateAB(input, secret);
+                    setHistory(prev => [{ guess: input, result }, ...prev]);
+                    const newFail = failCount + 1;
+                    setFailCount(newFail);
+                    setInput("");
+                    if (newFail >= 5) onFail();
+                    else { synth.error(); setShake(true); setTimeout(() => setShake(false), 500); }
+                }
+            };
+
+            return (
+                <motion.div initial={{opacity:0}} animate={{opacity:1}} className="h-full flex flex-col items-center justify-center p-4 bg-street">
+                    <div className="w-full max-w-md bg-black/90 border-4 border-white p-6 relative shadow-[10px_10px_0px_#ff0000]">
+                        {hint && <div className="mb-4 text-center text-black bg-green-400 font-bold p-2 font-mono border-2 border-white animate-pulse">{hint}</div>}
+                        <div className="flex justify-between items-center mb-4">
+                            <span className="font-ops text-red-500 text-xl">LOCKDOWN PROTOCOL</span>
+                            <div className="flex gap-1">
+                                {[...Array(5)].map((_, i) => (
+                                    <div key={i} className={`w-3 h-3 ${i < failCount ? 'bg-red-600 animate-pulse shadow-[0_0_5px_red]' : 'bg-gray-800'}`}></div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className={`bg-black border-b-4 border-red-600 h-20 mb-4 flex items-center justify-center text-5xl font-mono text-white tracking-[0.2em] ${shake ? 'shake-hard' : ''}`}>{input.padEnd(4, '_')}</div>
+                        <div className="h-32 overflow-y-auto mb-4 border border-gray-800 p-2 font-mono text-sm bg-gray-900/50">
+                            {history.length === 0 && <div className="text-gray-500 text-center mt-10">... WAITING FOR INPUT ...</div>}
+                            {history.map((h, i) => (
+                                <div key={i} className="flex justify-between border-b border-gray-700 py-1 text-gray-300">
+                                    <span>#{history.length - i} > {h.guess}</span>
+                                    <span className={h.result === "4A0B" ? "text-green-400" : "text-yellow-500"}>{h.result}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
+                                <button key={n} onClick={() => handleInput(String(n))} className="py-3 bg-zinc-800 text-white font-ops text-2xl hover:bg-white hover:text-black transition-colors">{n}</button>
+                            ))}
+                            <button onClick={handleDelete} className="py-3 bg-red-900/50 text-red-200 font-bold hover:bg-red-600">DEL</button>
+                            <button onClick={() => handleInput("0")} className="py-3 bg-zinc-800 text-white font-ops text-2xl hover:bg-white hover:text-black">0</button>
+                            <button onClick={handleSubmit} className="py-3 bg-green-600 text-black font-bold font-ops text-xl hover:bg-green-400">ENT</button>
+                        </div>
+                    </div>
+                </motion.div>
+            );
+        };
+
+        const SkullScreen = ({ onFinish }) => {
+            useEffect(() => { synth.jumpscare(); const timer = setTimeout(onFinish, 4000); return () => clearTimeout(timer); }, []);
+            return (
+                <div className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-center overflow-hidden">
+                    <div className="absolute inset-0 bg-red-600 animate-pulse mix-blend-overlay"></div>
+                    <div className="scare-anim relative z-10 flex flex-col items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 24 24" fill="currentColor" className="text-white drop-shadow-[0_0_10px_red]"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49l-1.34-3.34c-.2-.5.17-1.05.71-1.05h1.22c.38 0 .73.21.89.55l1.02 2.15 2.18-1.55a.99.99 0 0 1 1.17 0l2.18 1.55 1.02-2.15c.16-.34.51-.55.89-.55h1.22c.54 0 .91.55.71 1.05l-1.34 3.34C19.13 20.17 22 16.42 22 12c0-5.52-4.48-10-10-10zm-3 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm6 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+                        <h1 className="text-6xl md:text-9xl font-glitch text-red-600 mt-8 glitch-text" data-text="ERROR">ERROR</h1>
+                        <p className="text-2xl md:text-4xl font-marker text-white mt-4 bg-red-600 px-4">Absolutely wrong。</p>
+                    </div>
+                </div>
+            );
+        };
+
+        const RiddleChallenge = ({ onSolved, riddleIndex }) => {
+            const [answer, setAnswer] = useState("");
+            const [error, setError] = useState(false);
+            const [showSuccess, setShowSuccess] = useState(false);
+            const currentRiddle = RIDDLES[riddleIndex % RIDDLES.length];
+            const isFinalRiddle = currentRiddle.nextStage === 'reveal';
+
+            const checkAnswer = () => {
+                let isCorrect = false;
+                if (currentRiddle.matchType === 'exact') {
+                    isCorrect = answer.trim() === currentRiddle.answerKeywords[0];
+                } else {
+                    isCorrect = currentRiddle.answerKeywords.some(keyword => answer.includes(keyword));
+                }
+                
+                if (isCorrect) {
+                    if (isFinalRiddle) {
+                        bgmPlayer.pause(); 
+                        synth.silence(); 
+                    } else {
+                        synth.unlock();
+                    }
+                    setShowSuccess(true);
+                    setTimeout(() => {
+                        onSolved(currentRiddle.nextStage, currentRiddle.gameHint);
+                    }, 4000); 
+                } else {
+                    synth.error();
+                    setError(true);
+                    setAnswer("");
+                    setTimeout(() => setError(false), 500);
+                }
+            };
+
+            return (
+                <motion.div initial={{opacity: 0}} animate={{opacity: 1}} className={`h-full flex flex-col items-center justify-center p-6 ${showSuccess && isFinalRiddle ? 'bg-[#1a1a1a]' : 'bg-zinc-950'} transition-colors duration-1000`}>
+                    <div className="w-full max-w-lg border-2 border-red-900 p-8 rounded bg-black shadow-[0_0_30px_rgba(255,0,0,0.2)]">
+                        <h2 className="text-3xl font-marker text-red-500 mb-6 text-center">ACCESS RECOVERY</h2>
+                        
+                        {!showSuccess ? (
+                            <>
+                                <div className="font-mono text-gray-300 mb-4 whitespace-pre-wrap text-center leading-relaxed text-lg">{currentRiddle.question}</div>
+                                {currentRiddle.hintText && <div className="text-green-600 text-sm mb-8 text-center font-mono">{currentRiddle.hintText}</div>}
+                                <input type="text" value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Type answer here..." className={`w-full bg-zinc-900 border-b-2 p-3 text-center text-xl outline-none mb-8 font-tech text-white transition-colors ${error ? 'border-red-500 placeholder-red-500' : 'border-gray-700 focus:border-red-500'}`} />
+                                <button onClick={checkAnswer} className="w-full bg-white text-black py-3 font-ops text-xl hover:bg-red-600 hover:text-white transition-all">CONFIRM</button>
+                            </>
+                        ) : (
+                            <motion.div initial={{opacity:0}} animate={{opacity:1}} className="text-center py-8">
+                                {!isFinalRiddle && <div className="text-green-500 text-6xl mb-4">✓</div>}
+                                <p className={`text-lg font-sans leading-relaxed whitespace-pre-wrap ${isFinalRiddle ? 'text-white text-2xl font-light italic' : 'text-white'}`}>{currentRiddle.correctMsg}</p>
+                            </motion.div>
+                        )}
+                    </div>
+                </motion.div>
+            );
+        };
+
+        const RevealScreen = ({ onFinish }) => {
+            useEffect(() => {
+                const timer = setTimeout(onFinish, 6000);
+                return () => clearTimeout(timer);
+            }, []);
+
+            return (
+                <motion.div initial={{opacity: 0}} animate={{opacity: 1}} exit={{opacity: 0}} className="h-screen flex flex-col items-center justify-center bg-reveal text-center p-8">
+                    <motion.h1 initial={{y: 20, opacity: 0}} animate={{y: 0, opacity: 1}} transition={{delay: 0.5, duration: 1}} className="text-4xl md:text-5xl font-ops text-gray-500 mb-4 tracking-widest">THE ANSWER IS</motion.h1>
+                    <motion.div initial={{scale: 0.8, opacity: 0}} animate={{scale: 1, opacity: 1}} transition={{delay: 2, duration: 1}} className="text-8xl md:text-9xl font-cinzel text-white mb-12 font-bold tracking-tighter drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]">0427</motion.div>
+                    <motion.div initial={{opacity: 0}} animate={{opacity: 1}} transition={{delay: 4, duration: 1}} className="text-gray-400 font-serif italic text-lg md:text-xl">
+                        <p>Some answers aren’t meant to be guessed.</p>
+                        <p>They’re meant to be remembered.</p>
+                    </motion.div>
+                </motion.div>
+            );
+        };
+
+        // 6. Floating Memories (Modified for Ch.1 Logic)
+        const FloatingMemories = ({ onNextStage }) => {
+            const [index, setIndex] = useState(0);
+            const chapter = MEMORY_CHAPTERS[index];
+
+            useEffect(() => {
+                // 如果章節有指定 BGM，則切換音樂
+                if (chapter && chapter.bgm) {
+                    // 淡出舊音樂 (模擬)
+                    bgmPlayer.pause();
+                    bgmPlayer.src = chapter.bgm;
+                    bgmPlayer.volume = 0.6; // 中等音量
+                    bgmPlayer.play().catch(e => console.log("BGM play failed", e));
+                } else if (chapter) {
+                    // 恢復預設或其他邏輯，這裡簡化為不動作或保持靜音
+                }
+            }, [index]);
+
+            if (!chapter) return null;
+
+            const nextChapter = () => { if (index < MEMORY_CHAPTERS.length - 1) setIndex(prev => prev + 1); else onNextStage(); };
+
+            // 渲染內容選擇：分段式文字 (Lines) 或 普通文字 (Text)
+            const renderContent = () => {
+                if (chapter.lines) {
+                    return (
+                        <div className="space-y-6">
+                            {chapter.lines.map((line, i) => (
+                                <motion.p 
+                                    key={i}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: line.delay, duration: 1.0 }}
+                                    className="text-gray-300 text-lg md:text-xl leading-relaxed font-light font-sans whitespace-pre-line tracking-wide"
+                                >
+                                    {line.text}
+                                </motion.p>
+                            ))}
+                        </div>
+                    );
+                } else {
+                    return (
+                        <motion.div 
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 1 }}
+                            className="text-gray-300 text-lg md:text-xl leading-loose font-light font-sans whitespace-pre-line tracking-wide"
+                        >
+                            {chapter.text}
+                        </motion.div>
+                    );
+                }
+            };
+
+            return (
+                <div className="h-screen w-full bg-[#050505] flex items-center justify-center relative overflow-hidden p-6">
+                    {/* 淡入效果：無前奏動畫，畫面出現後 0.5 秒自然淡入 */}
+                    <motion.div 
+                        initial={{ opacity: 0 }} 
+                        animate={{ opacity: 1 }} 
+                        transition={{ duration: 1.5, delay: 0.5 }}
+                        className="absolute inset-0 pointer-events-none bg-black z-50"
+                        style={{ display: 'none' }} // 這裡用 CSS 動畫或 Framer 蓋一層黑幕再淡出會更順，但直接控制容器 opacity 也可以
+                    />
+
+                    <AnimatePresence mode='wait'>
+                        <motion.div key={chapter.id} initial={{ opacity: 0, filter: "blur(10px)" }} animate={{ opacity: 1, filter: "blur(0px)" }} exit={{ opacity: 0, filter: "blur(5px)" }} transition={{ duration: 2.0, ease: "easeInOut", delay: 0.5 }} className="z-10 w-full max-w-5xl flex flex-col md:flex-row items-center gap-10">
+                            <div className="w-full md:w-1/2">
+                                <div className="relative aspect-square md:aspect-[4/5] bg-black border border-zinc-800 p-2 shadow-2xl">
+                                    <SafeImage src={chapter.photos[0]} index={chapter.id} className="w-full h-full object-cover opacity-90" />
+                                </div>
+                            </div>
+                            <div className="w-full md:w-1/2 text-center md:text-left">
+                                <h3 className="text-4xl font-marker text-white mb-8">{chapter.title}</h3>
+                                {renderContent()}
+                                
+                                {/* 按鈕延遲出現，避免破壞氣氛 */}
+                                <motion.button 
+                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: chapter.lines ? 10 : 3 }} 
+                                    onClick={nextChapter} 
+                                    className="mt-16 px-6 py-2 border-b border-white/30 text-gray-400 hover:text-white hover:border-white transition-all text-sm tracking-widest mx-auto md:mx-0 block"
+                                >
+                                    {index === MEMORY_CHAPTERS.length - 1 ? "前往下一站" : "下一段記憶"}
+                                </motion.button>
+                            </div>
+                        </motion.div>
+                    </AnimatePresence>
+                </div>
+            );
+        };
+
+        const GiftSelection = () => {
+            const [gifts, setGifts] = useState([]);
+            const [selected, setSelected] = useState(null);
+            const [isRevealing, setIsRevealing] = useState(false);
+            const [showFlash, setShowFlash] = useState(false);
+
+            useEffect(() => { setGifts([...RAW_GIFTS].sort(() => Math.random() - 0.5)); }, []);
+            const handleSelect = (gift) => { if (isRevealing || selected) return; setIsRevealing(true); synth.impact(); setShowFlash(true); setTimeout(() => { setSelected(gift); setIsRevealing(false); setShowFlash(false); }, 100); };
+            const handleClaim = (gift) => {
+                if (gift.isLineGift) window.open(gift.link, '_blank');
+                else {
+                    const subject = `2026 驚喜禮物兌換：${gift.title}`;
+                    const body = `安安安！我抽中了「${gift.subtitle}」！\n\n${gift.desc}\n\n請準備好兌現承諾喔！❤️`;
+                    window.location.href = `mailto:${NOTIFY_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                }
+            };
+
+            return (
+                <div className="h-screen w-full flex flex-col items-center justify-center p-4 relative z-10 overflow-hidden bg-endo">
+                    {showFlash && <div className="fixed inset-0 bg-white z-50 animate-impact"></div>}
+                    <div className="vignette"></div>
+                    <AnimatePresence mode='wait'>
+                        {!selected ? (
+                            <motion.div key="list" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="w-full max-w-6xl z-20 flex flex-col items-center">
+                                <h2 className="text-5xl md:text-8xl font-ops mb-16 text-center text-white tracking-widest relative">CHOOSE<span className="absolute -bottom-4 left-0 w-full h-2 bg-red-600 transform skew-x-12"></span></h2>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-12 w-full px-4">
+                                    {gifts.map((gift, i) => (
+                                        <motion.div key={gift.id} initial={{y:50,opacity:0}} animate={{y:0,opacity:1}} transition={{delay:i*0.1}} onClick={() => handleSelect(gift)} className="cursor-pointer group relative perspective-1000">
+                                            <div className="h-80 bg-black border-[6px] border-white hover:border-red-600 transition-colors duration-100 flex flex-col items-center justify-center relative overflow-hidden group-hover:bg-zinc-900">
+                                                <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_45%,rgba(255,255,255,0.1)_50%,transparent_55%)] bg-[length:20px_20px] opacity-20"></div>
+                                                <div className="text-8xl mb-6 text-white group-hover:scale-110 transition-transform duration-75">🎁</div>
+                                                <div className="font-ops text-3xl text-white group-hover:text-red-600 tracking-widest">BOX 0{i+1}</div>
+                                            </div>
+                                        </motion.div>
+                                    ))}
+                                </div>
+                            </motion.div>
+                        ) : (
+                            <motion.div key="card" initial={{scale:0.9,opacity:0}} animate={{scale:1,opacity:1}} className="w-full max-w-md relative z-30">
+                                <div className="bg-black border-[8px] border-white p-8 relative shadow-[0_0_50px_rgba(0,0,0,0.8)]">
+                                    <div className="absolute top-0 left-0 w-full h-4 bg-red-600"></div>
+                                    <div className="absolute bottom-0 right-0 w-4 h-full bg-red-600"></div>
+                                    <div className="aspect-video bg-zinc-900 border-2 border-zinc-800 mb-8 overflow-hidden relative grayscale hover:grayscale-0 transition-all duration-500"><SafeImage src={selected.imgSrc} index={99} className="w-full h-full object-cover" /></div>
+                                    <div className="text-center">
+                                        <h2 className="text-4xl font-ops font-bold mb-2 text-white uppercase tracking-tighter">{selected.title}</h2>
+                                        <h3 className="text-xl font-marker mb-6 text-red-600 uppercase tracking-widest border-b border-zinc-800 pb-4">{selected.subtitle}</h3>
+                                        <p className="text-gray-400 mb-8 text-sm leading-relaxed font-sans font-medium tracking-wide">{selected.desc}</p>
+                                        <button onClick={() => handleClaim(selected)} className="w-full py-5 bg-white text-black font-ops text-2xl hover:bg-red-600 hover:text-white transition-all transform hover:-translate-y-1 hover:shadow-[0_10px_20px_rgba(255,0,0,0.3)]">TAKE IT</button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [stage, setStage] = useState('intro');
+            const [hint, setHint] = useState("");
+            const [riddleIdx, setRiddleIdx] = useState(0);
+
+            return (
+                <div className="w-full h-full min-h-screen bg-[#050505] text-white overflow-hidden">
+                    <AnimatePresence mode='wait'>
+                        {stage === 'intro' && <IntroScreen key="intro" onStart={() => setStage('game')} />}
+                        {stage === 'game' && <Game1A2B key="game" hint={hint} onUnlock={() => setStage('memory')} onFail={() => setStage('scare')} />}
+                        {stage === 'scare' && <SkullScreen key="scare" onFinish={() => setStage('riddle')} />}
+                        {stage === 'riddle' && (
+                            <RiddleChallenge 
+                                key="riddle" 
+                                riddleIndex={riddleIdx}
+                                onSolved={(nextStage, newHint) => {
+                                    if (nextStage === 'reveal') {
+                                        setStage('reveal');
+                                    } else {
+                                        setHint(newHint);
+                                        setRiddleIdx(prev => prev + 1); 
+                                        setStage(nextStage); 
+                                    }
+                                }} 
+                            />
+                        )}
+                        {stage === 'reveal' && <RevealScreen key="reveal" onFinish={() => setStage('memory')} />}
+                        {stage === 'memory' && <FloatingMemories key="memory" onNextStage={() => setStage('gift')} />}
+                        {stage === 'gift' && <GiftSelection key="gift" />}
+                    </AnimatePresence>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
