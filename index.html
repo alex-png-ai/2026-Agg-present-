@@ -94,6 +94,11 @@
                 osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 3.0);
                 synth.playNoise(2.0);
             },
+            happy: () => { 
+                [261.6, 329.6, 392.0, 523.2, 659.3, 784.0].forEach((freq, i) => {
+                    setTimeout(() => synth.playTone(freq, 'triangle', 1.0, 0.1), i * 150);
+                });
+            },
             silence: () => { }
         };
 
@@ -195,7 +200,6 @@
             { 
                 id: 8, 
                 title: "Chapter 07: 2026", 
-                // 👉 新增：請準備一張名為 IMG_7.jpg 的照片
                 photos: ['IMG_7.jpg'], 
                 lines: [
                     { text: "最後我想說的是：\n其實你已經做得很好了。\n真的，很努力，也很認真。", delay: 0 },
@@ -544,7 +548,6 @@
             );
         };
 
-        // 7. Gift Selection (Street Victory Style with Screenshot)
         const GiftSelection = () => {
             const [gifts, setGifts] = useState([]);
             const [selected, setSelected] = useState(null);
