@@ -544,21 +544,31 @@
             );
         };
 
+        // 7. Gift Selection (Street Victory Style with Screenshot)
         const GiftSelection = () => {
             const [gifts, setGifts] = useState([]);
             const [selected, setSelected] = useState(null);
             const [isRevealing, setIsRevealing] = useState(false);
             const [showFlash, setShowFlash] = useState(false);
+            const [showFinal, setShowFinal] = useState(false); // 新增狀態
 
             useEffect(() => { setGifts([...RAW_GIFTS].sort(() => Math.random() - 0.5)); }, []);
-            const handleSelect = (gift) => { if (isRevealing || selected) return; setIsRevealing(true); synth.impact(); setShowFlash(true); setTimeout(() => { setSelected(gift); setIsRevealing(false); setShowFlash(false); }, 100); };
-            const handleClaim = (gift) => {
-                if (gift.isLineGift) window.open(gift.link, '_blank');
-                else {
-                    const subject = `2026 驚喜禮物兌換：${gift.title}`;
-                    const body = `安安安！我抽中了「${gift.subtitle}」！\n\n${gift.desc}\n\n請準備好兌現承諾喔！❤️`;
-                    window.location.href = `mailto:${NOTIFY_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-                }
+            
+            const handleSelect = (gift) => { 
+                if (isRevealing || selected) return; 
+                setIsRevealing(true); 
+                synth.impact(); 
+                setShowFlash(true); 
+                setTimeout(() => { 
+                    setSelected(gift); 
+                    setIsRevealing(false); 
+                    setShowFlash(false); 
+                }, 100); 
+            };
+
+            const handleClaim = () => {
+                synth.happy(); 
+                setShowFinal(true); // 顯示截圖畫面
             };
 
             return (
@@ -581,7 +591,7 @@
                                     ))}
                                 </div>
                             </motion.div>
-                        ) : (
+                        ) : !showFinal ? (
                             <motion.div key="card" initial={{scale:0.9,opacity:0}} animate={{scale:1,opacity:1}} className="w-full max-w-md relative z-30">
                                 <div className="bg-black border-[8px] border-white p-8 relative shadow-[0_0_50px_rgba(0,0,0,0.8)]">
                                     <div className="absolute top-0 left-0 w-full h-4 bg-red-600"></div>
@@ -591,8 +601,31 @@
                                         <h2 className="text-4xl font-ops font-bold mb-2 text-white uppercase tracking-tighter">{selected.title}</h2>
                                         <h3 className="text-xl font-marker mb-6 text-red-600 uppercase tracking-widest border-b border-zinc-800 pb-4">{selected.subtitle}</h3>
                                         <p className="text-gray-400 mb-8 text-sm leading-relaxed font-sans font-medium tracking-wide">{selected.desc}</p>
-                                        <button onClick={() => handleClaim(selected)} className="w-full py-5 bg-white text-black font-ops text-2xl hover:bg-red-600 hover:text-white transition-all transform hover:-translate-y-1 hover:shadow-[0_10px_20px_rgba(255,0,0,0.3)]">TAKE IT</button>
+                                        <button onClick={handleClaim} className="w-full py-5 bg-white text-black font-ops text-2xl hover:bg-red-600 hover:text-white transition-all transform hover:-translate-y-1 hover:shadow-[0_10px_20px_rgba(255,0,0,0.3)]">TAKE IT</button>
                                     </div>
+                                </div>
+                            </motion.div>
+                        ) : (
+                            <motion.div key="final" initial={{scale:0.9, opacity:0}} animate={{scale:1, opacity:1}} className="w-full max-w-md relative z-30">
+                                <div className="bg-white border-[8px] border-red-600 p-8 relative shadow-[0_0_50px_rgba(255,0,0,0.5)] text-center transform -rotate-1">
+                                    <div className="absolute top-0 left-0 w-full h-4 bg-black"></div>
+                                    <div className="absolute bottom-0 right-0 w-4 h-full bg-black"></div>
+                                    
+                                    <h2 className="text-4xl font-marker text-black mb-4 tracking-widest">SCREENSHOT THIS</h2>
+                                    <div className="border-4 border-black p-4 mb-6 bg-gray-100 relative">
+                                        <div className="text-6xl mb-2">🎁</div>
+                                        <h3 className="text-2xl font-bold text-red-600 uppercase font-ops">{selected.subtitle}</h3>
+                                        <p className="text-sm text-gray-500 font-mono mt-1">ID: 2026-WINNER</p>
+                                    </div>
+                                    
+                                    <p className="text-xl font-bold text-black mb-2 leading-relaxed font-sans">
+                                        請截圖這個畫面<br/>
+                                        叫安安安承諾兌現給你喔!!!
+                                    </p>
+                                    <p className="text-lg text-gray-600 font-hand font-bold mt-6 tracking-wide border-t-2 border-dashed border-gray-300 pt-4">
+                                        2025 辛苦了<br/>
+                                        一起加油吧!!
+                                    </p>
                                 </div>
                             </motion.div>
                         )}
